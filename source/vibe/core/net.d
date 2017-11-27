@@ -15,7 +15,7 @@ import std.socket : AddressFamily, UnknownAddress;
 import vibe.core.log;
 import vibe.core.stream;
 import vibe.internal.async;
-import core.time : Duration;
+import core.time : Duration, seconds;
 
 @safe:
 
@@ -157,7 +157,7 @@ TCPListener listenTCP_s(ushort port, TCPConnectionFunction connection_callback, 
 	Establishes a connection to the given host/port.
 */
 TCPConnection connectTCP(string host, ushort port, string bind_interface = null,
-	ushort bind_port = 0, Duration timeout = Duration.max)
+	ushort bind_port = 0, Duration timeout = seconds(5))
 {
 	NetworkAddress addr = resolveHost(host);
 	addr.port = port;
@@ -178,7 +178,7 @@ TCPConnection connectTCP(string host, ushort port, string bind_interface = null,
 }
 /// ditto
 TCPConnection connectTCP(NetworkAddress addr, NetworkAddress bind_address = anyAddress,
-	Duration timeout = Duration.max)
+	Duration timeout = seconds(5))
 {
 	import std.conv : to;
 

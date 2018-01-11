@@ -361,6 +361,13 @@ struct FileInfo {
 
 	/// True if this is a directory or a symlink pointing to a directory
 	bool isDirectory;
+
+	/** True if the file's hidden attribute is set.
+
+		On systems that don't support a hidden attribute, any file starting with
+		a single dot will be treated as hidden.
+	*/
+	bool hidden;
 }
 
 /**
@@ -485,7 +492,6 @@ struct FileStream {
 			cb => eventDriver.files.cancelWrite(m_fd)
 		);
 		ctx.ptr += res[2];
-logDebug("Written %s", res[2]);
 		if (ctx.ptr > ctx.size) ctx.size = ctx.ptr;
 		enforce(res[1] == IOStatus.ok, "Failed to read data from disk.");
 		return res[2];
@@ -581,7 +587,13 @@ struct DirectoryWatcher { // TODO: avoid all those heap allocations!
 				case FileChangeKind.removed: ct = DirectoryChangeType.removed; break;
 				case FileChangeKind.modified: ct = DirectoryChangeType.modified; break;
 			}
-			this.changes ~= DirectoryChange(ct, NativePath.fromTrustedString(change.directory) ~ NativePath.fromTrustedString(change.name.idup));
+
+			static if (is(typeof(change.baseDirectory))) {
+				// eventcore 0.8.23 and up
+				this.changes ~= DirectoryChange(ct, NativePath.fromTrustedString(change.baseDirectory) ~ NativePath.fromTrustedString(change.directory) ~ NativePath.fromTrustedString(change.name.idup));
+			} else {
+				this.changes ~= DirectoryChange(ct, NativePath.fromTrustedString(change.directory) ~ NativePath.fromTrustedString(change.name.idup));
+			}
 			this.changeEvent.emit();
 		}
 	}
@@ -682,5 +694,10 @@ private FileInfo makeFileInfo(DirEntry ent)
 	else ret.timeCreated = ent.timeLastModified;
 	ret.isSymlink = ent.isSymlink;
 	ret.isDirectory = ent.isDir;
+	version (Windows) {
+		import core.sys.windows.windows : FILE_ATTRIBUTE_HIDDEN;
+		ret.hidden = (ent.attributes & FILE_ATTRIBUTE_HIDDEN) != 0;
+	}
+	else ret.hidden = ret.name.startsWith('.');
 	return ret;
 }

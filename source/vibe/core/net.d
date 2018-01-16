@@ -106,11 +106,11 @@ TCPListener listenTCP(ushort port, TCPConnectionDelegate connection_callback, st
 	auto sock = eventDriver.sockets.listenStream(addrc, sopts,
 		(StreamListenSocketFD ls, StreamSocketFD s, scope RefAddress addr) @safe nothrow {
 			import vibe.core.core : runTask;
-			auto conn = TCPConnection(s, addr);
+			auto conn = new TCPConnection(s, addr);
 			runTask(connection_callback, conn);
 		});
 	enforce(sock != StreamListenSocketFD.invalid, "Failed to listen on "~addr.toString());
-	return TCPListener(sock);
+	return new TCPListener(sock);
 }
 
 /// Compatibility overload - use an `@safe nothrow` callback instead.
@@ -214,7 +214,7 @@ TCPConnection connectTCP(NetworkAddress addr, NetworkAddress bind_address = anyA
 			": timeout");
 		enforce(status == ConnectStatus.connected, "Failed to connect to "~addr.toString()~": "~status.to!string);
 
-		return TCPConnection(sock, uaddr);
+		return new TCPConnection(sock, uaddr);
 	} ();
 }
 
@@ -224,14 +224,14 @@ TCPConnection connectTCP(NetworkAddress addr, NetworkAddress bind_address = anyA
 */
 UDPConnection listenUDP(ref NetworkAddress addr)
 {
-	return UDPConnection(addr);
+	return new UDPConnection(addr);
 }
 /// ditto
 UDPConnection listenUDP(ushort port, string bind_address = "0.0.0.0")
 {
 	auto addr = resolveHost(bind_address, AddressFamily.UNSPEC, false);
 	addr.port = port;
-	return UDPConnection(addr);
+	return new UDPConnection(addr);
 }
 
 NetworkAddress anyAddress()
@@ -464,7 +464,7 @@ struct NetworkAddress {
 /**
 	Represents a single TCP connection.
 */
-struct TCPConnection {
+final class TCPConnection: ConnectionStream {
 	@safe:
 
 	import core.time : seconds;
@@ -493,19 +493,11 @@ struct TCPConnection {
 		m_context.readBuffer.capacity = 4096;
 	}
 
-	this(this)
-	nothrow {
-		if (m_socket != StreamSocketFD.invalid)
-			eventDriver.sockets.addRef(m_socket);
-	}
-
 	~this()
 	nothrow {
 		if (m_socket != StreamSocketFD.invalid)
 			eventDriver.sockets.releaseRef(m_socket);
 	}
-
-	bool opCast(T)() const nothrow if (is(T == bool)) { return m_socket != StreamSocketFD.invalid; }
 
 	@property void tcpNoDelay(bool enabled) nothrow { eventDriver.sockets.setTCPNoDelay(m_socket, enabled); m_context.tcpNoDelay = enabled; }
 	@property bool tcpNoDelay() const nothrow { return m_context.tcpNoDelay; }
@@ -601,6 +593,8 @@ mixin(tracer);
 		});
 	}
 
+	alias read = ConnectionStream.read;
+
 	size_t read(scope ubyte[] dst, IOMode mode)
 	{
 mixin(tracer);
@@ -623,7 +617,7 @@ mixin(tracer);
 		return nbytes;
 	}
 
-	void read(scope ubyte[] dst) { auto r = read(dst, IOMode.all); assert(r == dst.length); }
+	alias write = ConnectionStream.write;
 
 	size_t write(in ubyte[] bytes, IOMode mode)
 	{
@@ -644,9 +638,7 @@ mixin(tracer);
 		return res[2];
 	}
 
-	void write(in ubyte[] bytes) { auto r = write(bytes, IOMode.all); assert(r == bytes.length); }
-	void write(in char[] bytes) { write(cast(const(ubyte)[])bytes); }
-	void write(InputStream stream) { write(stream, 0); }
+	void write(InputStream stream) { write(stream, cast(IOMode) 0); }
 
 	void flush() {
 mixin(tracer);
@@ -670,21 +662,21 @@ mixin(tracer);
 				assert(chunk > 0, "leastSize returned zero for non-empty stream.");
 				//logTrace("read pipe chunk %d", chunk);
 				stream.read(buffer[0 .. chunk]);
-				write(buffer[0 .. chunk]);
+				OutputStream.write(buffer[0 .. chunk]);
 			}
 		} else {
 			while( nbytes > 0 ){
 				size_t chunk = min(nbytes, buffer.length);
 				//logTrace("read pipe chunk %d", chunk);
 				stream.read(buffer[0 .. chunk]);
-				write(buffer[0 .. chunk]);
+				OutputStream.write(buffer[0 .. chunk]);
 				nbytes -= chunk;
 			}
 		}
 	}
 }
 
-mixin validateConnectionStream!TCPConnection;
+//mixin validateConnectionStream!TCPConnection;
 
 private void loopWithTimeout(alias LoopBody, ExceptionType = Exception)(Duration timeout)
 {
@@ -713,7 +705,7 @@ private void loopWithTimeout(alias LoopBody, ExceptionType = Exception)(Duration
 /**
 	Represents a listening TCP socket.
 */
-struct TCPListener {
+final class TCPListener {
 	// FIXME: copying may lead to dangling FDs - this somehow needs to employ reference counting without breaking
 	//        the previous behavior of keeping the socket alive when the listener isn't stored. At the same time,
 	//        stopListening() needs to keep working.
@@ -725,8 +717,6 @@ struct TCPListener {
 	{
 		m_socket = socket;
 	}
-
-	bool opCast(T)() const nothrow if (is(T == bool)) { return m_socket != StreamListenSocketFD.invalid; }
 
 	/// The local address at which TCP connections are accepted.
 	@property NetworkAddress bindAddress()
@@ -752,7 +742,7 @@ struct TCPListener {
 /**
 	Represents a bound and possibly 'connected' UDP socket.
 */
-struct UDPConnection {
+final class UDPConnection {
 	static struct Context {
 		bool canBroadcast;
 	}
@@ -770,20 +760,11 @@ struct UDPConnection {
 		m_context = () @trusted { return &eventDriver.sockets.userData!Context(m_socket); } ();
 	}
 
-
-	this(this)
-	nothrow {
-		if (m_socket != StreamSocketFD.invalid)
-			eventDriver.sockets.addRef(m_socket);
-	}
-
 	~this()
 	nothrow {
 		if (m_socket != StreamSocketFD.invalid)
 			eventDriver.sockets.releaseRef(m_socket);
 	}
-
-	bool opCast(T)() const nothrow if (is(T == bool)) { return m_socket != DatagramSocketFD.invalid; }
 
 	/** Returns the address to which the UDP socket is bound.
 	*/

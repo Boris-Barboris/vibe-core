@@ -17,7 +17,6 @@
 module vibe.core.stream;
 
 import vibe.internal.traits : checkInterfaceConformance, validateInterfaceConformance;
-import vibe.internal.interfaceproxy;
 import core.time;
 import std.algorithm;
 import std.conv;
@@ -283,18 +282,6 @@ final class NullOutputStream : OutputStream {
 	void flush() {}
 	void finalize() {}
 }
-
-
-/// Generic storage for types that implement the `InputStream` interface
-alias InputStreamProxy = InterfaceProxy!InputStream;
-/// Generic storage for types that implement the `OutputStream` interface
-alias OutputStreamProxy = InterfaceProxy!OutputStream;
-/// Generic storage for types that implement the `Stream` interface
-alias StreamProxy = InterfaceProxy!Stream;
-/// Generic storage for types that implement the `ConnectionStream` interface
-alias ConnectionStreamProxy = InterfaceProxy!ConnectionStream;
-/// Generic storage for types that implement the `RandomAccessStream` interface
-alias RandomAccessStreamProxy = InterfaceProxy!RandomAccessStream;
 
 
 /** Tests if the given aggregate type is a valid input stream.

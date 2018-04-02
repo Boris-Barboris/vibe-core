@@ -501,7 +501,11 @@ final class TCPConnection: ConnectionStream {
 
 	@property void tcpNoDelay(bool enabled) nothrow { eventDriver.sockets.setTCPNoDelay(m_socket, enabled); m_context.tcpNoDelay = enabled; }
 	@property bool tcpNoDelay() const nothrow { return m_context.tcpNoDelay; }
-	@property void keepAlive(bool enabled) nothrow { eventDriver.sockets.setKeepAlive(m_socket, enabled); m_context.keepAlive = enabled; }
+	@property void keepAlive(bool enabled) nothrow {
+		eventDriver.sockets.setKeepAliveParams(m_socket, seconds(30), seconds(30), 3);
+		eventDriver.sockets.setUserTimeout(m_socket, seconds(5));
+		m_context.keepAlive = enabled;
+	}
 	@property bool keepAlive() const nothrow { return m_context.keepAlive; }
 	@property void readTimeout(Duration duration) { m_context.readTimeout = duration; }
 	@property Duration readTimeout() const nothrow { return m_context.readTimeout; }
@@ -562,7 +566,7 @@ mixin(tracer);
 
 		if (cancelled) return false;
 
-		logTrace("Socket %s, read %s bytes: %s", m_socket, nbytes, status);
+		logInfo("Socket %s, read %s bytes: %s", m_socket, nbytes, status);
 
 		assert(m_context.readBuffer.length == 0);
 		m_context.readBuffer.putN(nbytes);

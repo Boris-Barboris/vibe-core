@@ -566,7 +566,7 @@ mixin(tracer);
 
 		if (cancelled) return false;
 
-		logInfo("Socket %s, read %s bytes: %s", m_socket, nbytes, status);
+		logTrace("Socket %s, read %s bytes: %s", m_socket, nbytes, status);
 
 		assert(m_context.readBuffer.length == 0);
 		m_context.readBuffer.putN(nbytes);

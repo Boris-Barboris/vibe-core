@@ -14,6 +14,7 @@ import core.thread;
 import std.exception;
 import std.traits;
 import std.typecons;
+import std.meta: staticMap;
 import std.variant;
 
 
@@ -529,7 +530,7 @@ package struct TaskFuncInfo {
 		import std.traits : hasElaborateAssign;
 		import std.conv : to;
 
-		static struct TARGS { ARGS expand; }
+		static struct TARGS { staticMap!(Unqual, ARGS) expand; }
 
 		static assert(CALLABLE.sizeof <= TaskFuncInfo.callable.length,
 			"Storage required for task callable is too large ("~CALLABLE.sizeof~" vs max "~callable.length~"): "~CALLABLE.stringof);
@@ -579,7 +580,7 @@ package struct TaskFuncInfo {
 		return *cast(C*)callable.ptr;
 	}
 
-	@property ref A typedArgs(A)()
+	@property ref auto typedArgs(A)()
 	{
 		static assert(A.sizeof <= args.sizeof);
 		return *cast(A*)args.ptr;
